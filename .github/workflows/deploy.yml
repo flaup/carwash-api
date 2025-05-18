@@ -24,8 +24,12 @@ jobs:
       - name: Deploy via SSH
         run: |
           ssh ${{ secrets.LOGIN }}@${{ secrets.HOST }} << 'EOF'
+            set -e
             cd /opt/carwash-api
             git pull
-            echo "${{ secrets.ENV }}" > carwash/.env
+            cat <<EOT > carwash/.env
+          ${{ secrets.ENV}}
+          EOT
             docker-compose down
             docker-compose up -d --build
+          EOF
