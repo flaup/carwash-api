@@ -1,0 +1,34 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan ${{ secrets.HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy via SSH
+        run: |
+          ssh ${{ secrets.LOGIN }}@${{ secrets.HOST }} << 'EOF'
+            cd /opt/carwash-api
+            git pull
+            cat <<EOT > carwash/.env
+            ${{ secrets.ENV}}
+            EOT
+                docker-compose down
+                docker-compose up -d --build
+            EOF

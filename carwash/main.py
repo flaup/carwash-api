@@ -35,6 +35,11 @@ class ServiceBase(BaseModel):
 class ServiceResponse(ServiceBase):
     serviceid: UUID
 
+
+@app.get("/health")
+async def health_check():
+    return {"status": "OK", "message": "Backend is running"}
+
 # Роуты для автомоек
 @app.post("/carwashes/", response_model=CarwashResponse)
 def create_carwash(carwash: CarwashBase):
