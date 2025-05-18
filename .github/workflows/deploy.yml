@@ -25,9 +25,9 @@ jobs:
         run: |
           ssh ${{ secrets.LOGIN }}@${{ secrets.HOST }} << 'EOF'
             set -e
-            cd /opt/carwash-api
+            cd /opt/carwash-api/carwash
             git pull
-            cat <<EOT > carwash/.env
+            cat <<EOT > .env
           ${{ secrets.ENV}}
           EOT
             docker-compose down
