@@ -5,12 +5,21 @@ from pydantic import BaseModel
 from typing import List, Optional
 from uuid import UUID, uuid4
 from datetime import time
+from fastapi.middleware.cors import CORSMiddleware
 
 from base import engine
 
 
 SessionLocal = sessionmaker(bind=engine)
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Модели запросов и ответов
 class CarwashBase(BaseModel):
