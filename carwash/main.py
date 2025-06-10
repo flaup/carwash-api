@@ -61,6 +61,14 @@ class OrderResponse(OrderBase):
 class OrderUpdate(BaseModel):
     state: int
 
+class FeedbackBase(BaseModel):
+    userid: UUID
+    carwashid: UUID
+    comment: str
+
+class FeedbackResponse(FeedbackBase):
+    feedbackid: UUID
+
 # Роуты для автомоек
 @app.post("/carwashes/", response_model=CarwashResponse)
 def create_carwash(carwash: CarwashBase):
@@ -444,6 +452,86 @@ def get_available_windows(carwash_id: UUID, date: date, service_id: UUID):
     except HTTPException:
         raise
     except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        session.close()
+
+@app.get("/feedback/{carwash_id}", response_model=List[FeedbackResponse])
+def get_feedback_by_carwash(carwash_id: UUID):
+    session = SessionLocal()
+    try:
+        query = text("""
+            SELECT feedbackid, userid, carwashid, comment
+            FROM feedback
+            WHERE carwashid = :carwashid
+            ORDER BY comment
+        """)
+        result = session.execute(query, {"carwashid": carwash_id})
+        feedbacks = [dict(row._mapping) for row in result]
+        return feedbacks
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        session.close()
+
+@app.post("/feedback/", response_model=FeedbackResponse)
+def create_feedback(feedback: FeedbackBase):
+    session = SessionLocal()
+    try:
+        user_exists = session.execute(
+            text("SELECT 1 FROM \"User\" WHERE userid = :userid"),
+            {"userid": feedback.userid}
+        ).fetchone()
+        
+        carwash_exists = session.execute(
+            text("SELECT 1 FROM carwashes WHERE carwashid = :carwashid"),
+            {"carwashid": feedback.carwashid}
+        ).fetchone()
+
+        if not user_exists or not carwash_exists:
+            raise HTTPException(status_code=404, detail="User or carwash not found")
+
+        feedback_id = uuid4()
+        query = text("""
+            INSERT INTO feedback (
+                feedbackid, userid, carwashid, comment
+            ) VALUES (
+                :feedbackid, :userid, :carwashid, :comment
+            ) RETURNING feedbackid
+        """)
+        result = session.execute(query, {
+            **feedback.dict(),
+            "feedbackid": feedback_id
+        })
+        session.commit()
+        return {**feedback.dict(), "feedbackid": feedback_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        session.close()
+
+@app.delete("/feedback/{feedback_id}", status_code=204)
+def delete_feedback(feedback_id: UUID):
+    session = SessionLocal()
+    try:
+        feedback_exists = session.execute(
+            text("SELECT 1 FROM feedback WHERE feedbackid = :feedbackid"),
+            {"feedbackid": feedback_id}
+        ).fetchone()
+
+        if not feedback_exists:
+            raise HTTPException(status_code=404, detail="Feedback not found")
+
+        query = text("DELETE FROM feedback WHERE feedbackid = :feedbackid")
+        session.execute(query, {"feedbackid": feedback_id})
+        session.commit()
+    except HTTPException:
+        raise
+    except Exception as e:
+        session.rollback()
         raise HTTPException(status_code=400, detail=str(e))
     finally:
         session.close()
